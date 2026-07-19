@@ -1,0 +1,49 @@
+# Build and IDE output
+artifacts/
+**/bin/
+**/obj/
+**/*_wpftmp.csproj
+.dotnet-home/
+.dotnet-cli/
+.vs/
+.idea/
+TestResults/
+coverage/
+coverage.*
+*.trx
+*.coverage
+*.coveragexml
+*.user
+*.suo
+
+# Local Codex data and application state
+.codex/
+.agents/
+.gate/
+AGENTS.md
+settings.json
+auth.json
+config.toml
+*.jsonl
+*.sqlite
+*.sqlite-*
+*.db
+*.log
+
+# Environment files and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+*.snk
+secrets.*
+secrets.json
+appsettings.*.json
+
+# Operating-system metadata
+Thumbs.db
+Desktop.ini
+.DS_Store

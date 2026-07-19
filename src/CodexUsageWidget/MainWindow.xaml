@@ -1,0 +1,863 @@
+<Window x:Class="CodexUsageWidget.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:CodexUsageWidget.Controls"
+        Title="Codex 额度"
+        Width="230"
+        Height="244"
+        MinWidth="160"
+        MinHeight="120"
+        MaxWidth="720"
+        MaxHeight="520"
+        WindowStyle="None"
+        ResizeMode="NoResize"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ShowInTaskbar="False"
+        Topmost="True"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextRenderingMode="Grayscale"
+        Loaded="Window_Loaded"
+        Closing="Window_Closing"
+        Closed="Window_Closed">
+    <Window.Resources>
+        <SolidColorBrush x:Key="TextPrimary" Color="#FFF5F7FA" />
+        <SolidColorBrush x:Key="TextSecondary" Color="#FF98A2B3" />
+        <SolidColorBrush x:Key="CardBackground" Color="#FF222630" />
+        <SolidColorBrush x:Key="PanelBorder" Color="#FF353B48" />
+        <SolidColorBrush x:Key="RingTrack" Color="#FF343946" />
+
+        <Style x:Key="IconButton" TargetType="Button">
+            <Setter Property="Width" Value="28" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Margin" Value="4,0,0,0" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="#FFAFB7C4" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonChrome"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonChrome" Property="Background" Value="#FF2B303C" />
+                                <Setter Property="Foreground" Value="#FFF7F9FC" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonChrome" Property="Background" Value="#FF343A47" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="QuotaCard" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource CardBackground}" />
+            <Setter Property="BorderBrush" Value="#FF303541" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="Padding" Value="14,12" />
+        </Style>
+
+        <Style x:Key="QuotaProgress" TargetType="ProgressBar">
+            <Setter Property="Height" Value="6" />
+            <Setter Property="Minimum" Value="0" />
+            <Setter Property="Maximum" Value="100" />
+            <Setter Property="Background" Value="#FF333844" />
+            <Setter Property="Foreground" Value="#FF34D399" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ProgressBar">
+                        <Grid x:Name="PART_Track" SnapsToDevicePixels="True">
+                            <Border Background="{TemplateBinding Background}" CornerRadius="3" />
+                            <Border x:Name="PART_Indicator"
+                                    HorizontalAlignment="Left"
+                                    Background="{TemplateBinding Foreground}"
+                                    CornerRadius="3" />
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="TokenScopeButton" TargetType="Button">
+            <Setter Property="Height" Value="22" />
+            <Setter Property="Padding" Value="10,0" />
+            <Setter Property="Background" Value="#2510A37F" />
+            <Setter Property="Foreground" Value="#FF5EE2BC" />
+            <Setter Property="BorderBrush" Value="#FF10A37F" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome"
+                                Padding="{TemplateBinding Padding}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="7">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Opacity" Value="0.82" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chrome" Property="Opacity" Value="0.62" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="TokenPeriodItem" TargetType="ComboBoxItem">
+            <Setter Property="MinHeight" Value="24" />
+            <Setter Property="Padding" Value="9,4" />
+            <Setter Property="Foreground" Value="#FFC7CBD4" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBoxItem">
+                        <Border x:Name="ItemChrome"
+                                Padding="{TemplateBinding Padding}"
+                                Background="{TemplateBinding Background}"
+                                CornerRadius="5">
+                            <ContentPresenter VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="ItemChrome" Property="Background" Value="#FF363C49" />
+                                <Setter Property="Foreground" Value="#FFF4F6F8" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="ItemChrome" Property="Background" Value="#334B82F6" />
+                                <Setter Property="Foreground" Value="#FFF4F6F8" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="TokenPeriodComboBox" TargetType="ComboBox">
+            <Setter Property="Height" Value="22" />
+            <Setter Property="MinWidth" Value="90" />
+            <Setter Property="Background" Value="#FF222630" />
+            <Setter Property="Foreground" Value="#FFC7CBD4" />
+            <Setter Property="BorderBrush" Value="#FF454B59" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="ItemContainerStyle" Value="{StaticResource TokenPeriodItem}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ComboBox">
+                        <Grid>
+                            <ToggleButton Focusable="False"
+                                          ClickMode="Press"
+                                          Background="Transparent"
+                                          BorderThickness="0"
+                                          IsChecked="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <ContentPresenter />
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                                <Border Background="{TemplateBinding Background}"
+                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                        BorderThickness="{TemplateBinding BorderThickness}"
+                                        CornerRadius="7">
+                                    <Grid Margin="8,0,6,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="12" />
+                                        </Grid.ColumnDefinitions>
+                                        <ContentPresenter VerticalAlignment="Center"
+                                                          Content="{TemplateBinding SelectionBoxItem}"
+                                                          ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                                                          TextElement.Foreground="{TemplateBinding Foreground}" />
+                                        <Path Grid.Column="1"
+                                              Width="7"
+                                              Height="4"
+                                              HorizontalAlignment="Right"
+                                              VerticalAlignment="Center"
+                                              Data="M 0,0 L 3.5,4 L 7,0 Z"
+                                              Fill="{TemplateBinding Foreground}" />
+                                    </Grid>
+                                </Border>
+                            </ToggleButton>
+                            <Popup x:Name="PART_Popup"
+                                   AllowsTransparency="True"
+                                   Focusable="False"
+                                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                                   Placement="Bottom"
+                                   PopupAnimation="Fade">
+                                <Border MinWidth="{Binding ActualWidth, RelativeSource={RelativeSource TemplatedParent}}"
+                                        Margin="0,3,0,0"
+                                        Padding="4"
+                                        Background="#FF222630"
+                                        BorderBrush="#FF454B59"
+                                        BorderThickness="1"
+                                        CornerRadius="8">
+                                    <ScrollViewer CanContentScroll="True">
+                                        <ItemsPresenter />
+                                    </ScrollViewer>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="BorderBrush" Value="#FF677080" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ResizeThumb" TargetType="Thumb">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Thumb">
+                        <Border Background="Transparent" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Window.ContextMenu>
+        <ContextMenu FontFamily="{StaticResource UiFont}" FontSize="13">
+            <MenuItem Header="立即刷新" Click="Refresh_Click" />
+            <MenuItem Header="外观设置…" Click="Appearance_Click" />
+            <MenuItem x:Name="ShowTokenMenuItem"
+                      Header="显示 Token 消耗"
+                      IsCheckable="True"
+                      IsChecked="True" />
+            <MenuItem Header="打开官方 Usage 面板" Click="OpenUsage_Click" />
+            <Separator />
+            <MenuItem x:Name="TopmostMenuItem"
+                      Header="始终置顶"
+                      IsCheckable="True"
+                      IsChecked="True"
+                      Click="TopmostMenuItem_Click" />
+            <Separator />
+            <MenuItem Header="退出" Click="Close_Click" />
+        </ContextMenu>
+    </Window.ContextMenu>
+
+    <Grid>
+        <Viewbox x:Name="ContentViewbox"
+                 HorizontalAlignment="Center"
+                 VerticalAlignment="Center"
+                 Stretch="Uniform"
+                 StretchDirection="Both">
+            <Grid x:Name="DesignSurface" Width="460" Height="488">
+                <Border x:Name="WindowChrome"
+                        Margin="10"
+                        Background="#F5191C23"
+                        BorderBrush="#FF353B48"
+                        BorderThickness="1"
+                        CornerRadius="20">
+                    <Border.Effect>
+                        <DropShadowEffect BlurRadius="24"
+                                          Direction="270"
+                                          ShadowDepth="5"
+                                          Opacity="0.48"
+                                          Color="#FF000000" />
+                    </Border.Effect>
+
+                    <Grid Margin="16,13">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="42" />
+                            <RowDefinition Height="8" />
+                            <RowDefinition x:Name="QuotaContentRow" Height="208" />
+                            <RowDefinition x:Name="TokenTopGapRow" Height="8" />
+                            <RowDefinition x:Name="TokenContentRow" Height="142" />
+                            <RowDefinition x:Name="StatusTopGapRow" Height="8" />
+                            <RowDefinition Height="26" />
+                        </Grid.RowDefinitions>
+
+                        <Grid x:Name="DragRegion"
+                              Grid.Row="0"
+                              Background="Transparent"
+                              MouseLeftButtonDown="DragRegion_MouseLeftButtonDown">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="38" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="32" />
+                                <ColumnDefinition Width="32" />
+                                <ColumnDefinition Width="32" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border x:Name="LogoBorder"
+                                    Width="34"
+                                    Height="34"
+                                    HorizontalAlignment="Left"
+                                    VerticalAlignment="Center"
+                                    Background="#FF10A37F"
+                                    CornerRadius="10">
+                                <TextBlock x:Name="LogoText"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           FontFamily="Segoe UI Semibold"
+                                           FontSize="17"
+                                           FontWeight="SemiBold"
+                                           Foreground="White"
+                                           Text="C" />
+                            </Border>
+
+                            <StackPanel Grid.Column="1"
+                                        Margin="9,0,8,0"
+                                        VerticalAlignment="Center">
+                                <TextBlock FontFamily="{StaticResource UiFont}"
+                                           FontSize="15"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextPrimary}"
+                                           Text="Codex 额度" />
+                                <TextBlock x:Name="StyleSubtitleText"
+                                           Margin="0,1,0,0"
+                                           FontFamily="{StaticResource UiFont}"
+                                           FontSize="9.5"
+                                           Foreground="{DynamicResource TextSecondary}"
+                                           Text="环形视图" />
+                            </StackPanel>
+
+                            <Border x:Name="PlanBorder"
+                                    Grid.Column="2"
+                                    Height="22"
+                                    Padding="9,0"
+                                    VerticalAlignment="Center"
+                                    Background="#FF29303A"
+                                    CornerRadius="11">
+                                <TextBlock x:Name="PlanText"
+                                           VerticalAlignment="Center"
+                                           FontFamily="Segoe UI Semibold"
+                                           FontSize="10"
+                                           FontWeight="SemiBold"
+                                           Foreground="#FFA9B3C2"
+                                           Text="CODEX" />
+                            </Border>
+
+                            <Button x:Name="AppearanceButton"
+                                    Grid.Column="3"
+                                    Style="{StaticResource IconButton}"
+                                    ToolTip="大小、透明度、颜色与显示内容"
+                                    Click="Appearance_Click"
+                                    Content="⚙" />
+                            <Button x:Name="RefreshButton"
+                                    Grid.Column="4"
+                                    Style="{StaticResource IconButton}"
+                                    ToolTip="立即刷新"
+                                    Click="Refresh_Click"
+                                    Content="↻" />
+                            <Button x:Name="CloseButton"
+                                    Grid.Column="5"
+                                    Style="{StaticResource IconButton}"
+                                    ToolTip="关闭"
+                                    Click="Close_Click"
+                                    Content="×" />
+                        </Grid>
+
+                        <Grid Grid.Row="2">
+                            <Grid x:Name="CardQuotaView" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="10" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <Border x:Name="PrimaryCard" Grid.Column="0" Style="{StaticResource QuotaCard}">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="20" />
+                                            <RowDefinition Height="*" />
+                                            <RowDefinition Height="12" />
+                                            <RowDefinition Height="20" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock x:Name="PrimaryTitle"
+                                                   FontFamily="{StaticResource UiFont}"
+                                                   FontSize="12"
+                                                   Foreground="{DynamicResource TextSecondary}"
+                                                   Text="5 小时" />
+                                        <TextBlock Grid.Row="1"
+                                                   VerticalAlignment="Center"
+                                                   FontFamily="Segoe UI Variable Display, Segoe UI"
+                                                   FontSize="31"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextPrimary}">
+                                            <Run x:Name="PrimaryPercentRun" Text="--" /><Run FontSize="16" Text="%" />
+                                        </TextBlock>
+                                        <ProgressBar x:Name="PrimaryProgress"
+                                                     Grid.Row="2"
+                                                     VerticalAlignment="Center"
+                                                     Style="{StaticResource QuotaProgress}" />
+                                        <TextBlock x:Name="PrimaryResetText"
+                                                   Grid.Row="3"
+                                                   VerticalAlignment="Bottom"
+                                                   FontFamily="{StaticResource UiFont}"
+                                                   FontSize="10"
+                                                   Foreground="#FF7F8999"
+                                                   Text="正在读取…" />
+                                    </Grid>
+                                </Border>
+
+                                <Border x:Name="SecondaryCard" Grid.Column="2" Style="{StaticResource QuotaCard}">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="20" />
+                                            <RowDefinition Height="*" />
+                                            <RowDefinition Height="12" />
+                                            <RowDefinition Height="20" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock x:Name="SecondaryTitle"
+                                                   FontFamily="{StaticResource UiFont}"
+                                                   FontSize="12"
+                                                   Foreground="{DynamicResource TextSecondary}"
+                                                   Text="7 天" />
+                                        <TextBlock Grid.Row="1"
+                                                   VerticalAlignment="Center"
+                                                   FontFamily="Segoe UI Variable Display, Segoe UI"
+                                                   FontSize="31"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextPrimary}">
+                                            <Run x:Name="SecondaryPercentRun" Text="--" /><Run FontSize="16" Text="%" />
+                                        </TextBlock>
+                                        <ProgressBar x:Name="SecondaryProgress"
+                                                     Grid.Row="2"
+                                                     VerticalAlignment="Center"
+                                                     Style="{StaticResource QuotaProgress}" />
+                                        <TextBlock x:Name="SecondaryResetText"
+                                                   Grid.Row="3"
+                                                   VerticalAlignment="Bottom"
+                                                   FontFamily="{StaticResource UiFont}"
+                                                   FontSize="10"
+                                                   Foreground="#FF7F8999"
+                                                   Text="正在读取…" />
+                                    </Grid>
+                                </Border>
+                            </Grid>
+
+                            <Grid x:Name="RingQuotaView" Visibility="Visible">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="14" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <Grid Grid.Column="0">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*" />
+                                        <RowDefinition Height="24" />
+                                    </Grid.RowDefinitions>
+                                    <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <controls:CircularProgressRing x:Name="PrimaryRing"
+                                                                       Width="174"
+                                                                       Height="174"
+                                                                       StrokeThickness="10"
+                                                                       TrackBrush="{DynamicResource RingTrack}"
+                                                                       ProgressBrush="#FFFFAB19"
+                                                                       Value="0" />
+                                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <TextBlock x:Name="PrimaryRingTitle"
+                                                       Margin="0,0,0,5"
+                                                       HorizontalAlignment="Center"
+                                                       FontFamily="{StaticResource UiFont}"
+                                                       FontSize="12"
+                                                       Foreground="{DynamicResource TextSecondary}"
+                                                       Text="5 小时" />
+                                            <TextBlock HorizontalAlignment="Center"
+                                                       FontFamily="Segoe UI Variable Display, Segoe UI"
+                                                       FontSize="34"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource TextPrimary}">
+                                                <Run x:Name="PrimaryRingPercentRun" Text="--" /><Run FontSize="18" Text="%" />
+                                            </TextBlock>
+                                            <TextBlock Margin="0,1,0,0"
+                                                       HorizontalAlignment="Center"
+                                                       FontFamily="{StaticResource UiFont}"
+                                                       FontSize="11"
+                                                       Foreground="{DynamicResource TextSecondary}"
+                                                       Text="剩余" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <TextBlock x:Name="PrimaryRingUsedText"
+                                               Grid.Row="1"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               FontFamily="{StaticResource UiFont}"
+                                               FontSize="11"
+                                               Foreground="{DynamicResource TextSecondary}"
+                                               Text="已用 --%" />
+                                </Grid>
+
+                                <Grid Grid.Column="2">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="*" />
+                                        <RowDefinition Height="24" />
+                                    </Grid.RowDefinitions>
+                                    <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <controls:CircularProgressRing x:Name="SecondaryRing"
+                                                                       Width="174"
+                                                                       Height="174"
+                                                                       StrokeThickness="10"
+                                                                       TrackBrush="{DynamicResource RingTrack}"
+                                                                       ProgressBrush="#FFFFD060"
+                                                                       Value="0" />
+                                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                                            <TextBlock x:Name="SecondaryRingTitle"
+                                                       Margin="0,0,0,5"
+                                                       HorizontalAlignment="Center"
+                                                       FontFamily="{StaticResource UiFont}"
+                                                       FontSize="12"
+                                                       Foreground="{DynamicResource TextSecondary}"
+                                                       Text="7 天" />
+                                            <TextBlock HorizontalAlignment="Center"
+                                                       FontFamily="Segoe UI Variable Display, Segoe UI"
+                                                       FontSize="34"
+                                                       FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource TextPrimary}">
+                                                <Run x:Name="SecondaryRingPercentRun" Text="--" /><Run FontSize="18" Text="%" />
+                                            </TextBlock>
+                                            <TextBlock Margin="0,1,0,0"
+                                                       HorizontalAlignment="Center"
+                                                       FontFamily="{StaticResource UiFont}"
+                                                       FontSize="11"
+                                                       Foreground="{DynamicResource TextSecondary}"
+                                                       Text="剩余" />
+                                        </StackPanel>
+                                    </Grid>
+                                    <TextBlock x:Name="SecondaryRingUsedText"
+                                               Grid.Row="1"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               FontFamily="{StaticResource UiFont}"
+                                               FontSize="11"
+                                               Foreground="{DynamicResource TextSecondary}"
+                                               Text="已用 --%" />
+                                </Grid>
+                            </Grid>
+                        </Grid>
+
+                        <Border x:Name="TokenUsagePanel"
+                                Grid.Row="4"
+                                Background="#B51F222C"
+                                BorderBrush="{DynamicResource PanelBorder}"
+                                BorderThickness="1"
+                                CornerRadius="14"
+                                Padding="12,8">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="24" />
+                                    <RowDefinition Height="35" />
+                                    <RowDefinition Height="10" />
+                                    <RowDefinition Height="38" />
+                                    <RowDefinition Height="11" />
+                                </Grid.RowDefinitions>
+
+                                <Grid Grid.Row="0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="8" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="7" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="26" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock VerticalAlignment="Center"
+                                               FontFamily="{StaticResource UiFont}"
+                                               FontSize="12"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextPrimary}"
+                                               Text="Token 消耗" />
+                                    <Button x:Name="TodayScopeButton"
+                                            Grid.Column="2"
+                                            Style="{StaticResource TokenScopeButton}"
+                                            Content="当日" />
+                                    <ComboBox x:Name="CumulativePeriodComboBox"
+                                              Grid.Column="4"
+                                              SelectedIndex="1"
+                                              Style="{StaticResource TokenPeriodComboBox}"
+                                              ToolTip="累计统计周期">
+                                        <ComboBoxItem Tag="SevenDays" Content="累计 7 天" />
+                                        <ComboBoxItem Tag="ThirtyDays" Content="累计 30 天" />
+                                        <ComboBoxItem Tag="NinetyDays" Content="累计 90 天" />
+                                        <ComboBoxItem Tag="All" Content="累计全部" />
+                                        <ComboBoxItem Tag="Custom" Content="自定义周期" />
+                                    </ComboBox>
+                                    <Button x:Name="HideTokenUsageButton"
+                                            Grid.Column="6"
+                                            Width="24"
+                                            Height="22"
+                                            Padding="0"
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            Cursor="Hand"
+                                            FontFamily="Segoe UI Symbol"
+                                            FontSize="15"
+                                            Foreground="{DynamicResource TextSecondary}"
+                                            ToolTip="隐藏 Token 消耗"
+                                            Content="◉" />
+                                </Grid>
+
+                                <Grid Grid.Row="1">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="1" />
+                                        <ColumnDefinition Width="14" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock x:Name="TokenTotalText"
+                                                   FontFamily="Segoe UI Variable Display, Segoe UI"
+                                                   FontSize="24"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextPrimary}"
+                                                   Text="—" />
+                                        <TextBlock Margin="1,-2,0,0"
+                                                   FontFamily="{StaticResource UiFont}"
+                                                   FontSize="9.5"
+                                                   Foreground="{DynamicResource TextSecondary}"
+                                                   Text="总 Token" />
+                                    </StackPanel>
+                                    <Border Grid.Column="1" Margin="0,2" Background="#445E6573" />
+                                    <StackPanel Grid.Column="3" VerticalAlignment="Center">
+                                        <TextBlock x:Name="EstimatedCostText"
+                                                   FontFamily="Segoe UI Variable Display, Segoe UI"
+                                                   FontSize="22"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextPrimary}"
+                                                   Text="≈ US$—" />
+                                        <TextBlock Margin="1,-2,0,0"
+                                                   FontFamily="{StaticResource UiFont}"
+                                                   FontSize="9.5"
+                                                   Foreground="{DynamicResource TextSecondary}"
+                                                   Text="API 等价估算" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <Grid x:Name="TokenDistributionGrid"
+                                      Grid.Row="2"
+                                      Height="6"
+                                      Margin="0,2"
+                                      VerticalAlignment="Center"
+                                      ClipToBounds="True">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition x:Name="RegularInputSegmentColumn" Width="1*" />
+                                        <ColumnDefinition x:Name="CachedInputSegmentColumn" Width="1*" />
+                                        <ColumnDefinition x:Name="VisibleOutputSegmentColumn" Width="1*" />
+                                        <ColumnDefinition x:Name="ReasoningOutputSegmentColumn" Width="1*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Grid.Column="0" Background="#FF3B82F6" CornerRadius="3,0,0,3" />
+                                    <Border Grid.Column="1" Background="#FF2DD4BF" />
+                                    <Border Grid.Column="2" Background="#FF8B5CF6" />
+                                    <Border Grid.Column="3" Background="#FFF59E0B" CornerRadius="0,3,3,0" />
+                                </Grid>
+
+                                <Grid Grid.Row="3" Margin="0,2,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="14" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="*" />
+                                            <RowDefinition Height="*" />
+                                        </Grid.RowDefinitions>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="13" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Ellipse Width="7" Height="7" VerticalAlignment="Center" Fill="#FF3B82F6" />
+                                        <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="10" Foreground="{DynamicResource TextSecondary}" Text="普通输入" />
+                                        <TextBlock x:Name="RegularInputTokenText" Grid.Column="2" VerticalAlignment="Center" FontSize="10" Foreground="{DynamicResource TextPrimary}" Text="—" />
+                                        <Ellipse Grid.Row="1" Width="7" Height="7" VerticalAlignment="Center" Fill="#FF8B5CF6" />
+                                        <TextBlock Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" FontSize="10" Foreground="{DynamicResource TextSecondary}" Text="可见输出" />
+                                        <TextBlock x:Name="VisibleOutputTokenText" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" FontSize="10" Foreground="{DynamicResource TextPrimary}" Text="—" />
+                                    </Grid>
+                                    <Border Grid.Column="1" Width="1" Margin="6,0" Background="#445E6573" />
+                                    <Grid Grid.Column="2">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="*" />
+                                            <RowDefinition Height="*" />
+                                        </Grid.RowDefinitions>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="13" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Ellipse Width="7" Height="7" VerticalAlignment="Center" Fill="#FF2DD4BF" />
+                                        <TextBlock Grid.Column="1" VerticalAlignment="Center" FontSize="10" Foreground="{DynamicResource TextSecondary}" Text="缓存输入" />
+                                        <TextBlock x:Name="CachedInputTokenText" Grid.Column="2" VerticalAlignment="Center" FontSize="10" Foreground="{DynamicResource TextPrimary}" Text="—" />
+                                        <Ellipse Grid.Row="1" Width="7" Height="7" VerticalAlignment="Center" Fill="#FFF59E0B" />
+                                        <TextBlock Grid.Row="1" Grid.Column="1" VerticalAlignment="Center" FontSize="10" Foreground="{DynamicResource TextSecondary}" Text="推理输出" />
+                                        <TextBlock x:Name="ReasoningOutputTokenText" Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" FontSize="10" Foreground="{DynamicResource TextPrimary}" Text="—" />
+                                    </Grid>
+                                </Grid>
+
+                                <TextBlock x:Name="TokenEstimateNoteText"
+                                           Grid.Row="4"
+                                           VerticalAlignment="Bottom"
+                                           FontFamily="{StaticResource UiFont}"
+                                           FontSize="8.5"
+                                           Foreground="{DynamicResource TextSecondary}"
+                                           Text="按各请求实际模型单价估算，不代表订阅账单" />
+                            </Grid>
+                        </Border>
+
+                        <Grid Grid.Row="6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Ellipse x:Name="StatusDot"
+                                     Width="7"
+                                     Height="7"
+                                     Margin="1,0,7,0"
+                                     VerticalAlignment="Center"
+                                     Fill="#FFF59E0B" />
+                            <TextBlock x:Name="StatusText"
+                                       Grid.Column="1"
+                                       VerticalAlignment="Center"
+                                       FontFamily="{StaticResource UiFont}"
+                                       FontSize="10.5"
+                                       Foreground="{DynamicResource TextSecondary}"
+                                       Text="正在连接 Codex…" />
+                            <TextBlock x:Name="RingNextResetText"
+                                       Grid.Column="2"
+                                       Margin="10,0,0,0"
+                                       VerticalAlignment="Center"
+                                       FontFamily="{StaticResource UiFont}"
+                                       FontSize="9.5"
+                                       Foreground="{DynamicResource TextSecondary}"
+                                       Text="下次重置时间未知" />
+                            <Border x:Name="BadgeBorder"
+                                    Grid.Column="3"
+                                    Height="22"
+                                    Margin="8,0,0,0"
+                                    Padding="8,0"
+                                    VerticalAlignment="Center"
+                                    Background="#FF26322F"
+                                    CornerRadius="9"
+                                    Visibility="Collapsed">
+                                <TextBlock x:Name="BadgeText"
+                                           VerticalAlignment="Center"
+                                           FontFamily="{StaticResource UiFont}"
+                                           FontSize="9.5"
+                                           Foreground="#FF86E6C4" />
+                            </Border>
+                        </Grid>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Viewbox>
+
+        <Grid Panel.ZIndex="100">
+            <Thumb Tag="Left"
+                   Width="8"
+                   Margin="2,16,0,16"
+                   HorizontalAlignment="Left"
+                   Cursor="SizeWE"
+                   Style="{StaticResource ResizeThumb}"
+                   DragDelta="ResizeThumb_DragDelta" />
+            <Thumb Tag="Right"
+                   Width="8"
+                   Margin="0,16,2,16"
+                   HorizontalAlignment="Right"
+                   Cursor="SizeWE"
+                   Style="{StaticResource ResizeThumb}"
+                   DragDelta="ResizeThumb_DragDelta" />
+            <Thumb Tag="Top"
+                   Height="8"
+                   Margin="16,2,16,0"
+                   VerticalAlignment="Top"
+                   Cursor="SizeNS"
+                   Style="{StaticResource ResizeThumb}"
+                   DragDelta="ResizeThumb_DragDelta" />
+            <Thumb Tag="Bottom"
+                   Height="8"
+                   Margin="16,0,16,2"
+                   VerticalAlignment="Bottom"
+                   Cursor="SizeNS"
+                   Style="{StaticResource ResizeThumb}"
+                   DragDelta="ResizeThumb_DragDelta" />
+
+            <Thumb Tag="TopLeft"
+                   Width="18"
+                   Height="18"
+                   HorizontalAlignment="Left"
+                   VerticalAlignment="Top"
+                   Cursor="SizeNWSE"
+                   Style="{StaticResource ResizeThumb}"
+                   DragDelta="ResizeThumb_DragDelta" />
+            <Thumb Tag="TopRight"
+                   Width="18"
+                   Height="18"
+                   HorizontalAlignment="Right"
+                   VerticalAlignment="Top"
+                   Cursor="SizeNESW"
+                   Style="{StaticResource ResizeThumb}"
+                   DragDelta="ResizeThumb_DragDelta" />
+            <Thumb Tag="BottomLeft"
+                   Width="18"
+                   Height="18"
+                   HorizontalAlignment="Left"
+                   VerticalAlignment="Bottom"
+                   Cursor="SizeNESW"
+                   Style="{StaticResource ResizeThumb}"
+                   DragDelta="ResizeThumb_DragDelta" />
+            <Thumb Tag="BottomRight"
+                   Width="22"
+                   Height="22"
+                   HorizontalAlignment="Right"
+                   VerticalAlignment="Bottom"
+                   Cursor="SizeNWSE"
+                   ToolTip="拖动调整大小"
+                   Style="{StaticResource ResizeThumb}"
+                   DragDelta="ResizeThumb_DragDelta" />
+        </Grid>
+
+        <Path x:Name="ResizeHint"
+              Panel.ZIndex="101"
+              Width="11"
+              Height="11"
+              Margin="0,0,15,15"
+              HorizontalAlignment="Right"
+              VerticalAlignment="Bottom"
+              Data="M 0,11 L 11,0 M 5,11 L 11,5"
+              IsHitTestVisible="False"
+              Stretch="None"
+              Stroke="#667F8999"
+              StrokeThickness="1.2" />
+    </Grid>
+</Window>

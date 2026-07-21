@@ -242,7 +242,7 @@ public partial class MainWindow : Window
             {
                 TokenTotalText.Text = "—";
                 EstimatedCostText.Text = "US$—";
-                ServiceTierEstimatedCostText.Text = "挡位估算 US$—";
+                ServiceTierEstimatedCostText.Text = "档位估算 US$—";
                 TokenEstimateNoteText.Text = "本地 Token 统计暂不可用";
                 TokenUsagePanel.ToolTip = "未能读取本地会话计数；额度环仍可正常使用。";
             }
@@ -269,7 +269,7 @@ public partial class MainWindow : Window
     {
         TokenTotalText.Text = "…";
         EstimatedCostText.Text = "正在估算";
-        ServiceTierEstimatedCostText.Text = "正在读取挡位…";
+        ServiceTierEstimatedCostText.Text = "正在读取档位…";
         TokenEstimateNoteText.Text = "正在读取本地 Codex Token 计数…";
         RegularInputTokenText.Text = "…";
         CachedInputTokenText.Text = "…";
@@ -384,7 +384,7 @@ public partial class MainWindow : Window
         var tierLabel = FormatServiceTierLabel(tierCost.ObservedServiceTiers);
         if (tierCost.UnpricedTokens > 0 && tierCost.EstimatedUsd == 0)
         {
-            ServiceTierEstimatedCostText.Text = $"挡位覆盖 {tierCoverageText} · US$—";
+            ServiceTierEstimatedCostText.Text = $"档位覆盖 {tierCoverageText} · US$—";
         }
         else if (tierCost.InferredTokens > 0)
         {
@@ -407,27 +407,27 @@ public partial class MainWindow : Window
         if (tierCost.InferredTokens > 0 && !tierCost.IsPartialEstimate)
         {
             TokenEstimateNoteText.Text = cost.IsPartialEstimate
-                ? $"Standard {standardCoverageText} · 挡位 100%（推定 {tierInferenceText}）"
-                : $"挡位覆盖 100%（其中推定 {tierInferenceText}）";
+                ? $"Standard {standardCoverageText} · 档位 100%（推定 {tierInferenceText}）"
+                : $"档位覆盖 100%（其中推定 {tierInferenceText}）";
         }
         else if (cost.IsPartialEstimate && tierCost.IsPartialEstimate)
         {
             TokenEstimateNoteText.Text =
-                $"Standard {standardCoverageText} · 挡位 {tierCoverageText}（仅已覆盖部分）";
+                $"Standard {standardCoverageText} · 档位 {tierCoverageText}（仅已覆盖部分）";
         }
         else if (cost.IsPartialEstimate)
         {
             TokenEstimateNoteText.Text =
-                $"Standard 仅覆盖 {standardCoverageText}；挡位覆盖完整";
+                $"Standard 仅覆盖 {standardCoverageText}；档位覆盖完整";
         }
         else if (tierCost.IsPartialEstimate)
         {
             TokenEstimateNoteText.Text =
-                $"挡位仅覆盖 {tierCoverageText}；金额仅含已覆盖部分";
+                $"档位仅覆盖 {tierCoverageText}；金额仅含已覆盖部分";
         }
         else
         {
-            TokenEstimateNoteText.Text = "Standard 等价与线程挡位估算，均非实际账单";
+            TokenEstimateNoteText.Text = "Standard 等价与线程档位估算，均非实际账单";
         }
 
         var unknownModels = cost.UnknownModels.Count > 0
@@ -440,18 +440,18 @@ public partial class MainWindow : Window
             ? $"\n使用参考价的模型：{string.Join("、", tierCost.UnknownModels.Take(4))}"
             : string.Empty;
         var unknownTiers = tierCost.UnknownServiceTiers.Count > 0
-            ? $"\n按 Standard 推定的缺失/未知挡位：{string.Join("、", tierCost.UnknownServiceTiers.Take(4))}"
+            ? $"\n按 Standard 推定的缺失/未知档位：{string.Join("、", tierCost.UnknownServiceTiers.Take(4))}"
             : string.Empty;
         var referenceModels = tierCost.ReferenceModels.Count > 0
             ? $"\n参考模型：{string.Join("、", tierCost.ReferenceModels.Take(4))}"
             : string.Empty;
         var inferenceNote = tierCost.InferredTokens > 0
-            ? $"\n挡位金额覆盖全部 Token；其中 {FormatTokenCount(tierCost.InferredTokens)} Token " +
-              $"({tierInferenceText}) 使用显式兜底推定：缺失/未知挡位按 Standard，" +
-              "内部模型或缺少公开缓存写入价时按参考模型的同挡位价格。"
+            ? $"\n档位金额覆盖全部 Token；其中 {FormatTokenCount(tierCost.InferredTokens)} Token " +
+              $"({tierInferenceText}) 使用显式兜底推定：缺失/未知档位按 Standard，" +
+              "内部模型或缺少公开缓存写入价时按参考模型的同档位价格。"
             : string.Empty;
         var tierCoverageNote = tierCost.UnpricedTokens > 0
-            ? $"\n挡位估算覆盖 {FormatTokenCount(totals.TotalTokens - Math.Min(totals.TotalTokens, tierCost.UnpricedTokens))} Token " +
+            ? $"\n档位估算覆盖 {FormatTokenCount(totals.TotalTokens - Math.Min(totals.TotalTokens, tierCost.UnpricedTokens))} Token " +
               $"({tierCoverageText})；当前金额仅代表已覆盖部分，未覆盖 {FormatTokenCount(tierCost.UnpricedTokens)} Token。"
             : string.Empty;
         var standardCoverageNote = cost.UnpricedTokens > 0
@@ -463,8 +463,8 @@ public partial class MainWindow : Window
             "从本机 Codex 会话中的 token_count 事件聚合；仅读取计数字段与模型名。\n" +
             $"金额按公开 Standard API Token 单价逐请求估算（核验于 {TokenCostEstimator.PricingVerifiedDate}），" +
             "不含工具调用费，也不代表订阅账单。\n" +
-            $"另行按日志中最近一次 thread_settings_applied 的 service_tier 估算线程挡位价格（{tierLabel}）；" +
-            "fast 归入 Priority；该设置不等同于响应最终采用的计费挡位。" +
+            $"另行按日志中最近一次 thread_settings_applied 的 service_tier 估算线程档位价格（{tierLabel}）；" +
+            "fast 归入 Priority；该设置不等同于响应最终采用的计费档位。" +
             unknownModels + standardCoverageNote + tierUnknownModels + unknownTiers + referenceModels + inferenceNote + tierCoverageNote + cacheWriteNote +
             (string.IsNullOrWhiteSpace(snapshot.Warning) ? string.Empty : $"\n{snapshot.Warning}");
     }
@@ -502,12 +502,12 @@ public partial class MainWindow : Window
     {
         if (tiers.Count == 0)
         {
-            return "挡位估算";
+            return "档位估算";
         }
 
         if (tiers.Count > 1)
         {
-            return "混合挡位";
+            return "混合档位";
         }
 
         return tiers[0] switch
@@ -515,7 +515,7 @@ public partial class MainWindow : Window
             "standard" => "Standard",
             "priority" => "Priority",
             "flex" => "Flex",
-            _ => "挡位估算"
+            _ => "档位估算"
         };
     }
 

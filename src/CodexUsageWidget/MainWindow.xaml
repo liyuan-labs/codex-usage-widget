@@ -654,11 +654,13 @@
                                                    FontWeight="SemiBold"
                                                    Foreground="{DynamicResource TextPrimary}"
                                                    Text="≈ US$—" />
-                                        <TextBlock Margin="1,-2,0,0"
+                                        <TextBlock x:Name="ServiceTierEstimatedCostText"
+                                                   Margin="1,-2,0,0"
                                                    FontFamily="{StaticResource UiFont}"
                                                    FontSize="9.5"
                                                    Foreground="{DynamicResource TextSecondary}"
-                                                   Text="API 等价估算" />
+                                                   Text="挡位估算 US$—"
+                                                   TextTrimming="CharacterEllipsis" />
                                     </StackPanel>
                                 </Grid>
 

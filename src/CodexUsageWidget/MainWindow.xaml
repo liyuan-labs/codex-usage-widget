@@ -659,7 +659,7 @@
                                                    FontFamily="{StaticResource UiFont}"
                                                    FontSize="9.5"
                                                    Foreground="{DynamicResource TextSecondary}"
-                                                   Text="挡位估算 US$—"
+                                                   Text="档位估算 US$—"
                                                    TextTrimming="CharacterEllipsis" />
                                     </StackPanel>
                                 </Grid>

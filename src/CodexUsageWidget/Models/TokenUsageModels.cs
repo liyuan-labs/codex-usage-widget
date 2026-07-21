@@ -59,7 +59,8 @@ public sealed record TokenUsageTotals(
 public sealed record TokenUsageSample(
     DateTimeOffset Timestamp,
     string? Model,
-    TokenUsageTotals Totals);
+    TokenUsageTotals Totals,
+    string? ServiceTier = null);
 
 public sealed record TokenCostEstimate(
     decimal EstimatedUsd,
@@ -70,11 +71,33 @@ public sealed record TokenCostEstimate(
     public static TokenCostEstimate Empty { get; } = new(0m, 0, false, Array.Empty<string>());
 }
 
+public sealed record ServiceTierCostEstimate(
+    decimal EstimatedUsd,
+    long UnpricedTokens,
+    bool IsPartialEstimate,
+    IReadOnlyList<string> UnknownModels,
+    IReadOnlyList<string> UnknownServiceTiers,
+    IReadOnlyList<string> ObservedServiceTiers,
+    long InferredTokens,
+    IReadOnlyList<string> ReferenceModels)
+{
+    public static ServiceTierCostEstimate Empty { get; } = new(
+        0m,
+        0,
+        false,
+        Array.Empty<string>(),
+        Array.Empty<string>(),
+        Array.Empty<string>(),
+        0,
+        Array.Empty<string>());
+}
+
 public sealed record TokenUsagePeriodSnapshot(
     DateTimeOffset Start,
     DateTimeOffset EndExclusive,
     TokenUsageTotals Totals,
-    TokenCostEstimate Cost);
+    TokenCostEstimate Cost,
+    ServiceTierCostEstimate ServiceTierCost);
 
 public sealed record TokenUsageSnapshot(
     TokenUsagePeriodSnapshot Today,

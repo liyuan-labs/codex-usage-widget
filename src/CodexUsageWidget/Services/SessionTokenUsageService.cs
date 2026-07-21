@@ -27,7 +27,7 @@ public sealed class SessionTokenUsageService
             Path.Combine(home, "sessions"),
             Path.Combine(home, "archived_sessions")
         ];
-        _costEstimator = costEstimator ?? new TokenCostEstimator();
+        _costEstimator = costEstimator ?? new TokenCostEstimator(TryReadConfiguredModel(home));
     }
 
     public Task<TokenUsageSnapshot> GetSnapshotAsync(
@@ -258,6 +258,7 @@ public sealed class SessionTokenUsageService
                 state.Accepted.Clear();
                 state.AcceptUsage = false;
                 state.CurrentModel = null;
+                state.CurrentServiceTier = null;
             }
         }
         catch (JsonException)
@@ -303,6 +304,7 @@ public sealed class SessionTokenUsageService
                     state.Accepted.Clear();
                     state.AcceptUsage = false;
                     state.CurrentModel = null;
+                    state.CurrentServiceTier = null;
                 }
 
                 return;
@@ -321,6 +323,8 @@ public sealed class SessionTokenUsageService
                 threadSettings.ValueKind == JsonValueKind.Object)
             {
                 state.CurrentModel = GetString(threadSettings, "model") ?? state.CurrentModel;
+                state.CurrentServiceTier =
+                    GetString(threadSettings, "service_tier") ?? state.CurrentServiceTier;
                 return;
             }
 
@@ -397,7 +401,11 @@ public sealed class SessionTokenUsageService
             }
 
             bucket.Add(
-                new TokenUsageSample(timestamp, state.CurrentModel, delta),
+                new TokenUsageSample(
+                    timestamp,
+                    state.CurrentModel,
+                    delta,
+                    state.CurrentServiceTier),
                 _costEstimator);
         }
         catch (JsonException)
@@ -550,7 +558,73 @@ public sealed class SessionTokenUsageService
             accumulator.UnpricedTokens > 0,
             accumulator.UnknownModels
                 .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                .ToArray()),
+        new ServiceTierCostEstimate(
+            decimal.Round(accumulator.TierEstimatedUsd, 6, MidpointRounding.AwayFromZero),
+            accumulator.TierUnpricedTokens,
+            accumulator.TierUnpricedTokens > 0,
+            accumulator.TierUnknownModels
+                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
+            accumulator.UnknownServiceTiers
+                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
+            accumulator.ObservedServiceTiers
+                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                .ToArray(),
+            accumulator.TierInferredTokens,
+            accumulator.TierReferenceModels
+                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
                 .ToArray()));
+
+    private static string? TryReadConfiguredModel(string codexHome)
+    {
+        var path = Path.Combine(codexHome, "config.toml");
+        try
+        {
+            foreach (var rawLine in File.ReadLines(path))
+            {
+                var line = rawLine.Trim();
+                if (line.Length == 0 || line.StartsWith('#'))
+                {
+                    continue;
+                }
+
+                // Only the top-level model applies globally. Stop before profiles/providers.
+                if (line.StartsWith('['))
+                {
+                    break;
+                }
+
+                var separator = line.IndexOf('=');
+                if (separator < 0 ||
+                    !string.Equals(line[..separator].Trim(), "model", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var value = line[(separator + 1)..].Trim();
+                if (value.Length >= 2 && value[0] == '"')
+                {
+                    var closingQuote = value.IndexOf('"', 1);
+                    if (closingQuote > 1)
+                    {
+                        return value[1..closingQuote];
+                    }
+                }
+            }
+        }
+        catch (IOException)
+        {
+            // Missing, locked, or concurrently edited config: use the neutral default reference.
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // The widget can still estimate with its documented default reference model.
+        }
+
+        return null;
+    }
 
     private static bool IsDateInRange(
         DateOnly date,
@@ -737,6 +811,7 @@ public sealed class SessionTokenUsageService
         public TokenUsageTotals? PreviousTotal { get; set; }
         public UsageFields PreviousTotalFields { get; set; }
         public string? CurrentModel { get; set; }
+        public string? CurrentServiceTier { get; set; }
         public bool AcceptUsage { get; set; } = true;
         public Dictionary<DateOnly, DailyUsageAccumulator> Accepted { get; } = [];
     }
@@ -761,6 +836,13 @@ public sealed class SessionTokenUsageService
         public decimal EstimatedUsd { get; private set; }
         public long UnpricedTokens { get; private set; }
         public HashSet<string> UnknownModels { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public decimal TierEstimatedUsd { get; private set; }
+        public long TierUnpricedTokens { get; private set; }
+        public HashSet<string> TierUnknownModels { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public HashSet<string> UnknownServiceTiers { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public HashSet<string> ObservedServiceTiers { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public long TierInferredTokens { get; private set; }
+        public HashSet<string> TierReferenceModels { get; } = new(StringComparer.OrdinalIgnoreCase);
 
         public void Add(TokenUsageSample sample, TokenCostEstimator estimator)
         {
@@ -768,11 +850,60 @@ public sealed class SessionTokenUsageService
             if (estimator.TryEstimate(sample, out var estimatedUsd))
             {
                 EstimatedUsd += estimatedUsd;
+            }
+            else
+            {
+                UnpricedTokens = SaturatingAdd(UnpricedTokens, sample.Totals.TotalTokens);
+                UnknownModels.Add(string.IsNullOrWhiteSpace(sample.Model) ? "unknown" : sample.Model.Trim());
+            }
+
+            if (estimator.TryEstimateServiceTierFullCoverage(
+                    sample,
+                    out var tierEstimatedUsd,
+                    out var normalizedTier,
+                    out var usedInference,
+                    out var inferredModel,
+                    out var inferredServiceTier,
+                    out var referenceModel))
+            {
+                TierEstimatedUsd += tierEstimatedUsd;
+                ObservedServiceTiers.Add(normalizedTier);
+                if (usedInference)
+                {
+                    TierInferredTokens = SaturatingAdd(TierInferredTokens, sample.Totals.TotalTokens);
+                    if (inferredModel is not null)
+                    {
+                        TierUnknownModels.Add(inferredModel);
+                    }
+
+                    if (inferredServiceTier is not null)
+                    {
+                        UnknownServiceTiers.Add(inferredServiceTier);
+                    }
+
+                    if (referenceModel is not null)
+                    {
+                        TierReferenceModels.Add(referenceModel);
+                    }
+                }
+
                 return;
             }
 
-            UnpricedTokens = SaturatingAdd(UnpricedTokens, sample.Totals.TotalTokens);
-            UnknownModels.Add(string.IsNullOrWhiteSpace(sample.Model) ? "unknown" : sample.Model.Trim());
+            TierUnpricedTokens = SaturatingAdd(TierUnpricedTokens, sample.Totals.TotalTokens);
+            if (normalizedTier is null)
+            {
+                UnknownServiceTiers.Add(
+                    string.IsNullOrWhiteSpace(sample.ServiceTier)
+                        ? "unknown"
+                        : sample.ServiceTier.Trim());
+            }
+            else
+            {
+                ObservedServiceTiers.Add(normalizedTier);
+                TierUnknownModels.Add(
+                    string.IsNullOrWhiteSpace(sample.Model) ? "unknown" : sample.Model.Trim());
+            }
         }
 
         public DailyUsageBucket ToSnapshot() => new(
@@ -780,7 +911,14 @@ public sealed class SessionTokenUsageService
             Totals,
             EstimatedUsd,
             UnpricedTokens,
-            UnknownModels.ToArray());
+            UnknownModels.ToArray(),
+            TierEstimatedUsd,
+            TierUnpricedTokens,
+            TierUnknownModels.ToArray(),
+            UnknownServiceTiers.ToArray(),
+            ObservedServiceTiers.ToArray(),
+            TierInferredTokens,
+            TierReferenceModels.ToArray());
     }
 
     private sealed record DailyUsageBucket(
@@ -788,7 +926,14 @@ public sealed class SessionTokenUsageService
         TokenUsageTotals Totals,
         decimal EstimatedUsd,
         long UnpricedTokens,
-        IReadOnlyList<string> UnknownModels);
+        IReadOnlyList<string> UnknownModels,
+        decimal TierEstimatedUsd,
+        long TierUnpricedTokens,
+        IReadOnlyList<string> TierUnknownModels,
+        IReadOnlyList<string> UnknownServiceTiers,
+        IReadOnlyList<string> ObservedServiceTiers,
+        long TierInferredTokens,
+        IReadOnlyList<string> TierReferenceModels);
 
     private sealed class PeriodAccumulator
     {
@@ -796,15 +941,45 @@ public sealed class SessionTokenUsageService
         public decimal EstimatedUsd { get; private set; }
         public long UnpricedTokens { get; private set; }
         public HashSet<string> UnknownModels { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public decimal TierEstimatedUsd { get; private set; }
+        public long TierUnpricedTokens { get; private set; }
+        public HashSet<string> TierUnknownModels { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public HashSet<string> UnknownServiceTiers { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public HashSet<string> ObservedServiceTiers { get; } = new(StringComparer.OrdinalIgnoreCase);
+        public long TierInferredTokens { get; private set; }
+        public HashSet<string> TierReferenceModels { get; } = new(StringComparer.OrdinalIgnoreCase);
 
         public void Add(DailyUsageBucket bucket)
         {
             Totals += bucket.Totals;
             EstimatedUsd += bucket.EstimatedUsd;
             UnpricedTokens = SaturatingAdd(UnpricedTokens, bucket.UnpricedTokens);
+            TierEstimatedUsd += bucket.TierEstimatedUsd;
+            TierUnpricedTokens = SaturatingAdd(TierUnpricedTokens, bucket.TierUnpricedTokens);
+            TierInferredTokens = SaturatingAdd(TierInferredTokens, bucket.TierInferredTokens);
             foreach (var model in bucket.UnknownModels)
             {
                 UnknownModels.Add(model);
+            }
+
+            foreach (var model in bucket.TierUnknownModels)
+            {
+                TierUnknownModels.Add(model);
+            }
+
+            foreach (var tier in bucket.UnknownServiceTiers)
+            {
+                UnknownServiceTiers.Add(tier);
+            }
+
+            foreach (var tier in bucket.ObservedServiceTiers)
+            {
+                ObservedServiceTiers.Add(tier);
+            }
+
+            foreach (var model in bucket.TierReferenceModels)
+            {
+                TierReferenceModels.Add(model);
             }
         }
     }

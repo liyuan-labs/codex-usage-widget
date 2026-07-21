@@ -196,6 +196,134 @@ var knownCost = estimator.Estimate(new[]
 Check("estimates known-model Standard API equivalent", knownCost.EstimatedUsd == 0.012325m);
 Check("does not double-count reasoning output", knownCost.UnpricedTokens == 0);
 
+var prioritySample = new TokenUsageSample(
+    DateTimeOffset.UtcNow,
+    "gpt-5.6-sol",
+    new TokenUsageTotals(1_000, 400, 100, 300, 100),
+    "priority");
+Check(
+    "estimates Priority separately from Standard equivalent",
+    estimator.TryEstimateServiceTier(prioritySample, out var priorityCost, out var priorityTier) &&
+    priorityTier == "priority" &&
+    priorityCost == 0.02465m);
+Check(
+    "keeps Standard equivalent unchanged when a speed tier is present",
+    estimator.TryEstimate(prioritySample, out var unchangedStandardCost) &&
+    unchangedStandardCost == 0.012325m);
+
+var flexSample = prioritySample with { ServiceTier = "flex" };
+Check(
+    "estimates Flex separately from Standard equivalent",
+    estimator.TryEstimateServiceTier(flexSample, out var flexCost, out var flexTier) &&
+    flexTier == "flex" &&
+    flexCost == 0.0061625m);
+
+var gpt55Sample = new TokenUsageSample(
+    DateTimeOffset.UtcNow,
+    "gpt-5.5",
+    new TokenUsageTotals(1_000, 400, 0, 300, 100),
+    "priority");
+Check(
+    "uses the explicit GPT-5.5 Priority table instead of a blanket multiplier",
+    estimator.TryEstimateServiceTier(gpt55Sample, out var gpt55PriorityCost, out _) &&
+    gpt55PriorityCost == 0.0305m &&
+    estimator.TryEstimate(gpt55Sample, out var gpt55StandardCost) &&
+    gpt55StandardCost == 0.0122m);
+Check(
+    "uses the explicit GPT-5.5 Flex table",
+    estimator.TryEstimateServiceTier(
+        gpt55Sample with { ServiceTier = "flex" },
+        out var gpt55FlexCost,
+        out _) &&
+    gpt55FlexCost == 0.0061m);
+
+var gpt54CachedFlexSample = new TokenUsageSample(
+    DateTimeOffset.UtcNow,
+    "gpt-5.4",
+    new TokenUsageTotals(1_000, 1_000, 0, 0, 0),
+    "flex");
+Check(
+    "uses the published GPT-5.4 Flex cached-input rate",
+    estimator.TryEstimateServiceTier(gpt54CachedFlexSample, out var gpt54FlexCost, out _) &&
+    gpt54FlexCost == 0.00013m);
+
+var unpublishedCacheWriteSample = gpt55Sample with
+{
+    Totals = new TokenUsageTotals(1_000, 400, 100, 300, 100)
+};
+Check(
+    "does not invent an unpublished cache-write price",
+    !estimator.TryEstimate(unpublishedCacheWriteSample, out _) &&
+    !estimator.TryEstimateServiceTier(unpublishedCacheWriteSample, out _, out _));
+
+var unknownTierSample = prioritySample with { ServiceTier = "future-tier" };
+Check(
+    "does not guess an unknown speed-tier price",
+    !estimator.TryEstimateServiceTier(unknownTierSample, out _, out var unknownTier) &&
+    unknownTier is null &&
+    estimator.TryEstimate(unknownTierSample, out var unknownTierStandardCost) &&
+    unknownTierStandardCost == 0.012325m);
+
+Check(
+    "maps Codex fast to the published Priority table",
+    estimator.TryEstimateServiceTier(
+        prioritySample with { ServiceTier = "fast" },
+        out var fastCost,
+        out var fastTier) &&
+    fastTier == "priority" &&
+    fastCost == priorityCost);
+
+var solFallbackEstimator = new TokenCostEstimator("gpt-5.6-sol");
+Check(
+    "full coverage infers Standard when the log has no tier",
+    solFallbackEstimator.TryEstimateServiceTierFullCoverage(
+        prioritySample with { ServiceTier = null },
+        out var missingTierCost,
+        out var missingTier,
+        out var missingTierWasInferred,
+        out var missingTierModel,
+        out var missingTierSource,
+        out var missingTierReference) &&
+    missingTier == "standard" &&
+    missingTierCost == 0.012325m &&
+    missingTierWasInferred &&
+    missingTierModel is null &&
+    missingTierSource == "unknown" &&
+    missingTierReference is null);
+
+var internalPrioritySample = prioritySample with { Model = "codex-auto-review" };
+Check(
+    "full coverage prices an internal model with the configured public reference",
+    solFallbackEstimator.TryEstimateServiceTierFullCoverage(
+        internalPrioritySample,
+        out var internalPriorityCost,
+        out var internalPriorityTier,
+        out var internalPriorityWasInferred,
+        out var internalModel,
+        out var internalTier,
+        out var internalReference) &&
+    internalPriorityTier == "priority" &&
+    internalPriorityCost == priorityCost &&
+    internalPriorityWasInferred &&
+    internalModel == "codex-auto-review" &&
+    internalTier is null &&
+    internalReference == "gpt-5.6-sol");
+
+Check(
+    "full coverage uses the reference model when cache-write pricing is unpublished",
+    solFallbackEstimator.TryEstimateServiceTierFullCoverage(
+        unpublishedCacheWriteSample,
+        out var cacheWriteFallbackCost,
+        out _,
+        out var cacheWriteWasInferred,
+        out var cacheWriteModel,
+        out _,
+        out var cacheWriteReference) &&
+    cacheWriteFallbackCost == priorityCost &&
+    cacheWriteWasInferred &&
+    cacheWriteModel == "gpt-5.5" &&
+    cacheWriteReference == "gpt-5.6-sol");
+
 var partialCost = estimator.Estimate(new[]
 {
     new TokenUsageSample(
@@ -243,6 +371,7 @@ try
             type = "turn_context",
             payload = new { model = "gpt-5.6-terra" }
         }),
+        ThreadSettingsLine(now.AddMinutes(-18.5), "gpt-5.6-terra", "priority"),
         TokenCountLine(now.AddMinutes(-18), 100, 40, 50, 10, cacheWrite: 20),
         TokenCountLine(
             now.AddMinutes(-17),
@@ -277,6 +406,7 @@ try
             type = "turn_context",
             payload = new { model = "gpt-5.6-terra" }
         }),
+        ThreadSettingsLine(now.AddMinutes(-12.5), "gpt-5.6-terra", "default"),
         TokenCountLine(now.AddMinutes(-12), 160, 60, 80, 20),
         JsonSerializer.Serialize(new
         {
@@ -291,6 +421,7 @@ try
             type = "turn_context",
             payload = new { model = "gpt-5.6-luna", context_padding = new string('y', 300_000) }
         }),
+        ThreadSettingsLine(now.AddMinutes(-8.5), "gpt-5.6-luna", "flex"),
         TokenCountLine(now.AddMinutes(-8), 250, 80, 100, 25)
     };
     File.WriteAllLines(childPath, childLines, new UTF8Encoding(false));
@@ -324,6 +455,14 @@ try
     Check("deduplicates active and archived rollout copies", todayOnly.Today.Totals.TotalTokens == 300);
     Check("handles oversized fork control lines", todayOnly.Today.Totals.InputTokens == 210);
     Check("skips unrequested cumulative scan", todayOnly.Accumulated.Totals.TotalTokens == 0);
+    Check("keeps Standard equivalent available beside tier estimate",
+        todayOnly.Today.Cost.EstimatedUsd > 0 &&
+        todayOnly.Today.ServiceTierCost.EstimatedUsd > 0);
+    Check("associates token deltas with the latest applied thread tier",
+        !todayOnly.Today.ServiceTierCost.IsPartialEstimate &&
+        todayOnly.Today.ServiceTierCost.ObservedServiceTiers.Count == 2 &&
+        todayOnly.Today.ServiceTierCost.ObservedServiceTiers.Contains("priority") &&
+        todayOnly.Today.ServiceTierCost.ObservedServiceTiers.Contains("flex"));
 
     var cumulative = await tokenService.GetSnapshotAsync(new TokenUsageQuery(
         TokenUsagePeriod.SevenDays,
@@ -409,6 +548,16 @@ try
         CacheWriteInputTokens: 22,
         ReasoningOutputTokens: 14
     });
+    Check("fully covers tokens without an applied service tier using Standard inference",
+        snapshot.Today.ServiceTierCost is
+        {
+            IsPartialEstimate: false,
+            UnpricedTokens: 0,
+            InferredTokens: 225
+        } &&
+        snapshot.Today.ServiceTierCost.EstimatedUsd > 0 &&
+        snapshot.Today.ServiceTierCost.UnknownServiceTiers.Contains("unknown") &&
+        snapshot.Today.Cost.EstimatedUsd > 0);
 }
 finally
 {
@@ -545,6 +694,24 @@ static string TokenCountLine(
         }
     });
 }
+
+static string ThreadSettingsLine(
+    DateTimeOffset timestamp,
+    string model,
+    string serviceTier) => JsonSerializer.Serialize(new
+{
+    timestamp = timestamp.ToUniversalTime().ToString("O"),
+    type = "event_msg",
+    payload = new
+    {
+        type = "thread_settings_applied",
+        thread_settings = new
+        {
+            model,
+            service_tier = serviceTier
+        }
+    }
+});
 
 static string LastOnlyTokenCountLine(
     DateTimeOffset timestamp,
